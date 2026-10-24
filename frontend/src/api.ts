@@ -167,3 +167,7 @@ export function createWorkerService(payload: WorkerServiceCreate): Promise<Recor
 export function getMyWorkerServices(): Promise<WorkerListing[]> {
   return request<WorkerListing[]>("/api/workers/services/me", {}, true);
 }
+
+export function getCustomerBookings(): Promise<Booking[]> {
+  return request<Booking[]>("/api/bookings/me", {}, true);
+}

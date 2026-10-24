@@ -20,6 +20,7 @@ import {
   createBooking,
   discoverWorkerServices,
   getServices,
+  getCustomerBookings,
   loginUser,
   logoutUser,
   registerUser,
@@ -215,6 +216,28 @@ function App() {
   const [authRole, setAuthRole] = useState<"customer" | "worker">("customer");
   const [authBusy, setAuthBusy] = useState(false);
   const [bookingBusy, setBookingBusy] = useState(false);
+  const [customerBookings, setCustomerBookings] = useState<Booking[]>([]);
+  const [customerBookingsLoading, setCustomerBookingsLoading] = useState(false);
+  const [customerBookingsError, setCustomerBookingsError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!currentUser || currentUser.role !== "customer" || !localStorage.getItem("workforum_token")) {
+      setCustomerBookings([]);
+      setCustomerBookingsError("");
+      setCustomerBookingsLoading(false);
+      return;
+    }
+    setCustomerBookingsLoading(true);
+    setCustomerBookingsError("");
+    getCustomerBookings()
+      .then((items) => { if (!cancelled) setCustomerBookings(items); })
+      .catch((err: unknown) => {
+        if (!cancelled) setCustomerBookingsError(err instanceof Error ? err.message : "Could not load booking history.");
+      })
+      .finally(() => { if (!cancelled) setCustomerBookingsLoading(false); });
+    return () => { cancelled = true; };
+  }, [currentUser]);
 
   useEffect(() => {
     let cancelled = false;
@@ -307,6 +330,7 @@ function App() {
         worker_service_id: selectedWorker.listing_id,
         description: jobDescription.trim(),
       });
+      setCustomerBookings((items) => [booking, ...items.filter((item) => item.id !== booking.id)]);
       setNotice(
         `Booking confirmed in the system! Booking ID: ${booking.id} · Status: ${booking.status} · Agreed price: ₹${Number(booking.agreed_price).toLocaleString("en-IN")}.`,
       );
@@ -441,6 +465,22 @@ function App() {
             <X size={18} />
           </button>
         </div>
+      )}
+
+      {currentUser?.role === "customer" && (
+        <section id="booking-history" className="mx-auto mt-6 max-w-7xl px-5 lg:px-8">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-700">Customer workspace</p>
+                <h2 className="mt-1 text-2xl font-extrabold">My booking history</h2>
+                <p className="mt-1 text-sm text-slate-500">Track requests, agreed prices, and service progress.</p>
+              </div>
+              <span className="w-fit rounded-full bg-teal-50 px-3 py-1.5 text-sm font-bold text-teal-800">{customerBookings.length} bookings</span>
+            </div>
+            {customerBookingsLoading ? <p className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Loading your bookings…</p> : customerBookingsError ? <p className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Could not load booking history: {customerBookingsError}</p> : customerBookings.length === 0 ? <div className="mt-5 rounded-xl border border-dashed border-slate-300 p-6 text-center"><p className="font-semibold">No bookings yet</p><p className="mt-1 text-sm text-slate-500">When you request a service, it will appear here with its current status.</p></div> : <div className="mt-5 grid gap-3 md:grid-cols-2">{customerBookings.map((booking) => <article key={booking.id} className="rounded-xl border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-bold">{booking.service_name || "Service booking"}</h3><p className="mt-1 text-xs text-slate-500">Booking #{booking.id.slice(0, 8)}</p></div><span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${booking.status === "completed" ? "bg-emerald-100 text-emerald-800" : booking.status === "rejected" ? "bg-rose-100 text-rose-800" : booking.status === "accepted" ? "bg-blue-100 text-blue-800" : "bg-amber-100 text-amber-800"}`}>{booking.status}</span></div><div className="mt-3 flex items-end justify-between gap-3"><div><p className="text-xs text-slate-500">Requested</p><p className="mt-1 text-sm">{booking.created_at ? new Date(booking.created_at).toLocaleString("en-IN") : "Date unavailable"}</p></div><p className="text-xl font-extrabold text-teal-800">₹{Number(booking.agreed_price).toLocaleString("en-IN")}</p></div>{booking.description && <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">{booking.description}</p>}</article>)}</div>}
+          </div>
+        </section>
       )}
 
       {currentUser?.role === "worker" && (
