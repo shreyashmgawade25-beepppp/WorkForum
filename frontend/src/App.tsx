@@ -850,12 +850,9 @@ function App() {
                         </div>
                       </div>
 
-                      {worker.verification_status === "verified" && (
-                        <span className="flex shrink-0 items-center gap-1 rounded-full bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-800">
-                          <BadgeCheck size={14} />
-                          Verified
-                        </span>
-                      )}
+                      <span className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${worker.verification_status === "verified" ? "bg-teal-50 text-teal-800" : worker.verification_status === "pending" ? "bg-amber-50 text-amber-800" : "bg-slate-100 text-slate-600"}`}>
+                        {worker.verification_status === "verified" ? <><BadgeCheck size={14} /> Verified</> : worker.verification_status === "pending" ? "Verification pending" : "Not verified"}
+                      </span>
                     </div>
 
                     <p className="mt-4 text-sm leading-6 text-slate-600">
@@ -880,6 +877,13 @@ function App() {
                         <Clock3 size={15} />
                         {worker.estimated_duration_minutes} min
                       </span>
+                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${worker.is_available ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
+                        {worker.is_available ? "Available now" : "Currently unavailable"}
+                      </span>
+                      <span className="text-xs text-slate-500">{worker.completed_jobs} completed jobs</span>
+                    </div>
+                    <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                      <strong>Trust details:</strong> {worker.verification_status === "verified" ? "Profile verification recorded" : worker.verification_status === "pending" ? "Verification has not been completed yet" : "No verified status recorded"}. {worker.average_rating > 0 ? "Rating reflects the profile's stored average." : "No customer rating recorded yet."}
                     </div>
 
                     {match.reasons.length > 0 && <p className="mt-3 text-xs leading-5 text-teal-800">Why this match: {match.reasons.join(" · ")}</p>}
