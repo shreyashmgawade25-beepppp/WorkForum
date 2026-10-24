@@ -480,6 +480,45 @@ function App() {
             </div>
             {customerBookingsLoading ? <p className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Loading your bookings…</p> : customerBookingsError ? <p className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Could not load booking history: {customerBookingsError}</p> : customerBookings.length === 0 ? <div className="mt-5 rounded-xl border border-dashed border-slate-300 p-6 text-center"><p className="font-semibold">No bookings yet</p><p className="mt-1 text-sm text-slate-500">When you request a service, it will appear here with its current status.</p></div> : <div className="mt-5 grid gap-3 md:grid-cols-2">{customerBookings.map((booking) => <article key={booking.id} className="rounded-xl border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-bold">{booking.service_name || "Service booking"}</h3><p className="mt-1 text-xs text-slate-500">Booking #{booking.id.slice(0, 8)}</p></div><span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${booking.status === "completed" ? "bg-emerald-100 text-emerald-800" : booking.status === "rejected" ? "bg-rose-100 text-rose-800" : booking.status === "accepted" ? "bg-blue-100 text-blue-800" : "bg-amber-100 text-amber-800"}`}>{booking.status}</span></div><div className="mt-3 flex items-end justify-between gap-3"><div><p className="text-xs text-slate-500">Requested</p><p className="mt-1 text-sm">{booking.created_at ? new Date(booking.created_at).toLocaleString("en-IN") : "Date unavailable"}</p></div><p className="text-xl font-extrabold text-teal-800">₹{Number(booking.agreed_price).toLocaleString("en-IN")}</p></div>{booking.description && <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">{booking.description}</p>}</article>)}</div>}
           </div>
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-700">Live account analytics</p>
+                <h2 className="mt-1 text-2xl font-extrabold">Your service activity</h2>
+                <p className="mt-1 text-sm text-slate-500">Calculated from your bookings currently returned by WorkForum.</p>
+              </div>
+              <span className="text-xs text-slate-400">Personal metrics · updates when booking data refreshes</span>
+            </div>
+            {(() => {
+              const completed = customerBookings.filter((booking) => booking.status === "completed");
+              const active = customerBookings.filter((booking) => booking.status === "pending" || booking.status === "accepted");
+              const spend = completed.reduce((sum, booking) => sum + Number(booking.agreed_price || 0), 0);
+              const statuses = [
+                { label: "Pending", count: customerBookings.filter((booking) => booking.status === "pending").length, color: "bg-amber-500" },
+                { label: "Accepted", count: customerBookings.filter((booking) => booking.status === "accepted").length, color: "bg-blue-500" },
+                { label: "Completed", count: completed.length, color: "bg-emerald-500" },
+                { label: "Rejected", count: customerBookings.filter((booking) => booking.status === "rejected").length, color: "bg-rose-500" },
+              ];
+              const maxStatus = Math.max(1, ...statuses.map((status) => status.count));
+              const serviceCounts = Object.entries(customerBookings.reduce<Record<string, number>>((counts, booking) => {
+                const name = booking.service_name || "Other service";
+                counts[name] = (counts[name] || 0) + 1;
+                return counts;
+              }, {})).sort((a, b) => b[1] - a[1]).slice(0, 4);
+              return <>
+                <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-xl bg-slate-50 p-4"><p className="text-sm text-slate-500">Total requests</p><p className="mt-2 text-3xl font-extrabold">{customerBookings.length}</p></div>
+                  <div className="rounded-xl bg-teal-50 p-4"><p className="text-sm text-teal-800">In progress</p><p className="mt-2 text-3xl font-extrabold text-teal-900">{active.length}</p></div>
+                  <div className="rounded-xl bg-emerald-50 p-4"><p className="text-sm text-emerald-800">Completed jobs</p><p className="mt-2 text-3xl font-extrabold text-emerald-900">{completed.length}</p></div>
+                  <div className="rounded-xl bg-cyan-50 p-4"><p className="text-sm text-cyan-800">Completed booking value</p><p className="mt-2 text-3xl font-extrabold text-cyan-900">₹{spend.toLocaleString("en-IN")}</p></div>
+                </div>
+                <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                  <div><h3 className="font-bold">Booking status breakdown</h3><div className="mt-4 space-y-4">{statuses.map((status) => <div key={status.label}><div className="mb-1 flex justify-between text-sm"><span className="text-slate-600">{status.label}</span><span className="font-bold">{status.count}</span></div><div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${status.color}`} style={{ width: `${(status.count / maxStatus) * 100}%` }} /></div></div>)}</div></div>
+                  <div><h3 className="font-bold">Most requested services</h3>{serviceCounts.length ? <div className="mt-3 space-y-2">{serviceCounts.map(([name, count]) => <div key={name} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 px-3 py-2.5"><span className="truncate text-sm text-slate-700">{name}</span><span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800">{count} {count === 1 ? "request" : "requests"}</span></div>)}</div> : <p className="mt-3 rounded-xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">Your service breakdown will appear after you make a booking.</p>}</div>
+                </div>
+              </>;
+            })()}
+          </div>
         </section>
       )}
 

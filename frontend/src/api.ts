@@ -126,6 +126,10 @@ export function logoutUser(): void {
   localStorage.removeItem("workforum_user");
 }
 
+export function getCustomerBookings(): Promise<Booking[]> {
+  return request<Booking[]>("/api/bookings/me", {}, true);
+}
+
 export function getWorkerBookings(): Promise<Booking[]> {
   return request<Booking[]>("/api/bookings/worker", {}, true);
 }
@@ -166,8 +170,4 @@ export function createWorkerService(payload: WorkerServiceCreate): Promise<Recor
 
 export function getMyWorkerServices(): Promise<WorkerListing[]> {
   return request<WorkerListing[]>("/api/workers/services/me", {}, true);
-}
-
-export function getCustomerBookings(): Promise<Booking[]> {
-  return request<Booking[]>("/api/bookings/me", {}, true);
 }
