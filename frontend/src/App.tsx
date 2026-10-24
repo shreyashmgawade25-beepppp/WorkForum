@@ -154,6 +154,45 @@ function WorkerDashboard({ userName, onSignOut, onNotice }: { userName: string; 
     } finally { setBusyId(""); }
   }
 
+  async function addPopularServices() {
+    const existingServiceIds = new Set(myServices.map((item) => item.service_id));
+    const missing = services.filter((service) => !existingServiceIds.has(service.id));
+    if (!missing.length) {
+      onNotice("You already have listings for every available service category.");
+      return;
+    }
+    setBusyId("bulk-services");
+    let added = 0;
+    const failed: string[] = [];
+    const suggestedPrice = (name: string) => {
+      const value = name.toLowerCase();
+      if (/plumb/.test(value)) return { price: 499, minutes: 60 };
+      if (/electric/.test(value)) return { price: 599, minutes: 60 };
+      if (/clean/.test(value)) return { price: 399, minutes: 90 };
+      if (/carpent/.test(value)) return { price: 699, minutes: 90 };
+      if (/paint/.test(value)) return { price: 999, minutes: 180 };
+      if (/ac|air condition|appliance|repair/.test(value)) return { price: 799, minutes: 90 };
+      if (/pest/.test(value)) return { price: 899, minutes: 90 };
+      if (/garden|landscap/.test(value)) return { price: 499, minutes: 60 };
+      if (/beauty|salon|personal care/.test(value)) return { price: 599, minutes: 60 };
+      if (/tutor|teach|education/.test(value)) return { price: 499, minutes: 60 };
+      if (/move|pack/.test(value)) return { price: 999, minutes: 120 };
+      return { price: 499, minutes: 60 };
+    };
+    for (const service of missing) {
+      const suggested = suggestedPrice(service.name);
+      try {
+        await createWorkerService({ service_id: service.id, base_price: suggested.price, estimated_duration_minutes: suggested.minutes });
+        added += 1;
+      } catch (error) {
+        failed.push(service.name);
+      }
+    }
+    await refreshDashboard();
+    onNotice(`Published ${added} additional service${added === 1 ? "" : "s"}${failed.length ? `. Could not publish: ${failed.join(", ")}` : ". Suggested prices are editable in your service listings."}`);
+    setBusyId("");
+  }
+
   async function changeStatus(booking: Booking, next: "accepted" | "rejected" | "completed") {
     setBusyId(booking.id);
     try {
@@ -178,7 +217,7 @@ function WorkerDashboard({ userName, onSignOut, onNotice }: { userName: string; 
         <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">Your service listings</p><p className="mt-2 text-3xl font-bold">{myServices.length}</p></div>
       </div>
       {profileExists === false && <form onSubmit={saveProfile} className="mt-7 rounded-2xl border border-teal-200 bg-white p-6 shadow-sm"><h2 className="text-xl font-bold">Set up your worker profile</h2><p className="mt-1 text-sm text-slate-500">Create your profile before publishing services or receiving requests.</p><div className="mt-4 grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold">City<input value={city} onChange={(e) => setCity(e.target.value)} required className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal" /></label><label className="text-sm font-semibold sm:col-span-2">Professional bio<textarea value={profileBio} onChange={(e) => setProfileBio(e.target.value)} required minLength={10} rows={3} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal" /></label></div><button disabled={busyId === "profile"} className="mt-4 rounded-xl bg-teal-700 px-5 py-3 font-semibold text-white disabled:opacity-60">{busyId === "profile" ? "Saving…" : "Create worker profile"}</button></form>}
-      {profileExists && <form onSubmit={addService} className="mt-7 rounded-2xl border border-slate-200 bg-white p-6"><h2 className="text-xl font-bold">Publish a service</h2><p className="mt-1 text-sm text-slate-500">Set a transparent price and estimated duration for customers.</p><div className="mt-4 grid gap-4 sm:grid-cols-3"><label className="text-sm font-semibold">Service category<select value={serviceId} onChange={(e) => setServiceId(e.target.value)} required className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal">{services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label><label className="text-sm font-semibold">Price (₹)<input type="number" min="1" step="1" value={price} onChange={(e) => setPrice(e.target.value)} required className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal" /></label><label className="text-sm font-semibold">Duration (minutes)<input type="number" min="15" step="15" value={duration} onChange={(e) => setDuration(e.target.value)} required className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal" /></label></div><button disabled={busyId === "service" || !services.length} className="mt-4 rounded-xl bg-teal-700 px-5 py-3 font-semibold text-white disabled:opacity-60">{busyId === "service" ? "Publishing…" : "Publish service listing"}</button></form>}
+      {profileExists && <form onSubmit={addService} className="mt-7 rounded-2xl border border-slate-200 bg-white p-6"><h2 className="text-xl font-bold">Publish a service</h2><p className="mt-1 text-sm text-slate-500">Set a transparent price and estimated duration for customers.</p><div className="mt-4 grid gap-4 sm:grid-cols-3"><label className="text-sm font-semibold">Service category<select value={serviceId} onChange={(e) => setServiceId(e.target.value)} required className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal">{services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label><label className="text-sm font-semibold">Price (₹)<input type="number" min="1" step="1" value={price} onChange={(e) => setPrice(e.target.value)} required className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal" /></label><label className="text-sm font-semibold">Duration (minutes)<input type="number" min="15" step="15" value={duration} onChange={(e) => setDuration(e.target.value)} required className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal" /></label></div><button disabled={busyId === "service" || !services.length} className="mt-4 rounded-xl bg-teal-700 px-5 py-3 font-semibold text-white disabled:opacity-60">{busyId === "service" ? "Publishing…" : "Publish service listing"}</button><button type="button" onClick={() => void addPopularServices()} disabled={busyId === "bulk-services" || !services.length || !profileExists} className="mt-4 ml-3 rounded-xl border border-teal-200 px-5 py-3 font-semibold text-teal-800 hover:bg-teal-50 disabled:opacity-60">{busyId === "bulk-services" ? "Publishing categories…" : `Quick-add all other categories (${Math.max(0, services.length - myServices.length)} available)`}</button><p className="mt-2 text-xs text-slate-500">Quick-add uses suggested demo prices. Review and adjust prices to match your actual services.</p></form>}
       <div className="mt-8"><div className="flex items-center justify-between"><h2 className="text-2xl font-bold">Incoming bookings</h2><span className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600">{bookings.length} total</span></div>
         {loading ? <div className="mt-4 rounded-2xl bg-white p-8 text-slate-500">Loading your workspace…</div> : dashboardError ? <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">{dashboardError}<p className="mt-2">Create your worker profile above if you haven't already, then refresh.</p></div> : bookings.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center"><h3 className="font-bold">No bookings yet</h3><p className="mt-2 text-sm text-slate-500">Publish a service listing and customer requests for your services will appear here.</p></div> : <div className="mt-4 grid gap-4">{bookings.map((booking) => <article key={booking.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase tracking-wide">{booking.status}</span><span className="text-xs text-slate-400">#{booking.id.slice(0, 8)}</span></div><h3 className="mt-3 text-lg font-bold">{booking.service_name || "Service request"}</h3><p className="mt-1 text-sm text-slate-500">Customer: {booking.customer_name || booking.customer_id}</p></div><p className="text-2xl font-extrabold text-teal-800">₹{Number(booking.agreed_price).toLocaleString("en-IN")}</p></div><p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">{booking.description}</p><p className="mt-3 text-xs text-slate-400">Received {new Date(booking.created_at).toLocaleString("en-IN")}</p><div className="mt-4 flex flex-wrap gap-2">{booking.status === "pending" && <><button disabled={busyId === booking.id} onClick={() => void changeStatus(booking, "accepted")} className="rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">Accept booking</button><button disabled={busyId === booking.id} onClick={() => void changeStatus(booking, "rejected")} className="rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60">Reject</button></>}{booking.status === "accepted" && <button disabled={busyId === booking.id} onClick={() => void changeStatus(booking, "completed")} className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">Mark completed</button>}</div></article>)}</div>}
       </div>
