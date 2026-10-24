@@ -54,6 +54,34 @@ function initials(name: string) {
     .toUpperCase();
 }
 
+/** Transparent prototype score (0–100); not a trained AI model. */
+function getSmartMatch(worker: WorkerListing, allWorkers: WorkerListing[], term: string) {
+  const prices = allWorkers.map((item) => Number(item.price)).filter((price) => Number.isFinite(price) && price > 0);
+  const minPrice = prices.length ? Math.min(...prices) : Number(worker.price);
+  const maxPrice = prices.length ? Math.max(...prices) : Number(worker.price);
+  const price = Number(worker.price) || 0;
+  const rating = Number(worker.average_rating) || 0;
+  const jobs = Number(worker.completed_jobs) || 0;
+  const query = term.trim().toLowerCase();
+  const serviceMatch = query && `${worker.service_name} ${worker.category}`.toLowerCase().includes(query);
+  const score = Math.round(
+    (worker.is_available ? 25 : 0) +
+    (worker.verification_status === "verified" ? 15 : 0) +
+    Math.min(20, Math.max(0, rating / 5 * 20)) +
+    Math.min(15, Math.log10(jobs + 1) * 7.5) +
+    (maxPrice === minPrice ? 15 : Math.max(0, 15 * (maxPrice - price) / (maxPrice - minPrice))) +
+    (serviceMatch ? 10 : 0)
+  );
+  const reasons: string[] = [];
+  if (worker.is_available) reasons.push("Available now");
+  if (worker.verification_status === "verified") reasons.push("Verified profile");
+  if (rating >= 4) reasons.push(`${rating.toFixed(1)}★ rating`);
+  if (jobs > 0) reasons.push(`${jobs} completed job${jobs === 1 ? "" : "s"}`);
+  if (prices.length && price === minPrice) reasons.push("Lowest listed price");
+  if (serviceMatch) reasons.push("Matches your search");
+  return { score: Math.min(100, score), reasons: reasons.slice(0, 3) };
+}
+
 
 function WorkerDashboard({ userName, onSignOut, onNotice }: { userName: string; onSignOut: () => void; onNotice: (message: string) => void }) {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -235,6 +263,12 @@ function App() {
         .includes(term),
     );
   }, [workers, search]);
+
+  const smartMatchedWorkers = useMemo(() => {
+    return filteredWorkers
+      .map((worker) => ({ worker, match: getSmartMatch(worker, workers, search) }))
+      .sort((a, b) => b.match.score - a.match.score);
+  }, [filteredWorkers, workers, search]);
 
   function searchForService(name: string) {
     setSearch(name);
@@ -649,12 +683,21 @@ function App() {
                 )}
               </div>
             ) : (
-              <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-                {filteredWorkers.map((worker) => (
+              <>
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-teal-100 bg-teal-50 px-4 py-3 text-sm">
+                <span className="flex items-center gap-2 font-semibold text-teal-900"><Sparkles size={16} /> SmartMatch ranking</span>
+                <span className="text-teal-800">Sorted by availability, verification, rating, experience, and price</span>
+              </div>
+              <div className="mt-5 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+                {smartMatchedWorkers.map(({ worker, match }, rankIndex) => (
                   <article
                     key={worker.listing_id}
                     className="rounded-2xl border border-slate-200 p-5 transition hover:border-teal-200 hover:shadow-lg"
                   >
+                    <div className="mb-4 flex items-center justify-between gap-2">
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">#{rankIndex + 1} match</span>
+                      <span className="rounded-full bg-teal-100 px-2.5 py-1 text-xs font-bold text-teal-900">{match.score}/100 score</span>
+                    </div>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
                         <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-teal-100 text-lg font-bold text-teal-800">
@@ -700,6 +743,8 @@ function App() {
                       </span>
                     </div>
 
+                    {match.reasons.length > 0 && <p className="mt-3 text-xs leading-5 text-teal-800">Why this match: {match.reasons.join(" · ")}</p>}
+
                     <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
                       <div>
                         <span className="text-xl font-extrabold">
@@ -719,6 +764,7 @@ function App() {
                   </article>
                 ))}
               </div>
+              </>
             )}
           </div>
         </section>
@@ -751,9 +797,7 @@ function App() {
                 <Sparkles className="text-teal-700" size={25} />
                 <h3 className="mt-3 font-bold">SmartMatch</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  The discovery prototype currently filters live listings by
-                  service, worker name, and location. Advanced matching is a
-                  planned extension.
+                  SmartMatch scores live listings using availability, verification, ratings, completed jobs, relative price, and search relevance. Scores are transparent prototype heuristics, not a trained AI model.
                 </p>
               </div>
             </div>
