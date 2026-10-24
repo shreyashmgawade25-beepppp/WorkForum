@@ -227,6 +227,9 @@ function WorkerDashboard({ userName, onSignOut, onNotice }: { userName: string; 
 
 function App() {
   const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All services");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [availableOnly, setAvailableOnly] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [services, setServices] = useState<Service[]>([]);
@@ -315,16 +318,22 @@ function App() {
     );
   }, [services, search]);
 
+  const workerCategories = useMemo(
+    () => Array.from(new Set(workers.map((worker) => worker.category || worker.service_name).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [workers],
+  );
+
   const filteredWorkers = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return workers;
-
-    return workers.filter((worker) =>
-      `${worker.worker_name} ${worker.service_name} ${worker.category} ${worker.city}`
-        .toLowerCase()
-        .includes(term),
-    );
-  }, [workers, search]);
+    const priceLimit = maxPrice.trim() ? Number(maxPrice) : null;
+    return workers.filter((worker) => {
+      const matchesSearch = !term || `${worker.worker_name} ${worker.service_name} ${worker.category} ${worker.city} ${worker.description}`.toLowerCase().includes(term);
+      const matchesCategory = selectedCategory === "All services" || (worker.category || worker.service_name) === selectedCategory;
+      const matchesPrice = priceLimit === null || (Number.isFinite(priceLimit) && worker.price <= priceLimit);
+      const matchesAvailability = !availableOnly || worker.is_available;
+      return matchesSearch && matchesCategory && matchesPrice && matchesAvailability;
+    });
+  }, [workers, search, selectedCategory, maxPrice, availableOnly]);
 
   const smartMatchedWorkers = useMemo(() => {
     return filteredWorkers
@@ -768,6 +777,23 @@ function App() {
               </p>
             </div>
 
+            <div className="mt-6 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="text-sm font-semibold text-slate-700">Search workers and services
+                <div className="relative mt-1"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Plumbing, cleaning, worker…" className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-9 pr-3 font-normal outline-none focus:border-teal-600" /></div>
+              </label>
+              <label className="text-sm font-semibold text-slate-700">Service category
+                <select value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal"><option>All services</option>{workerCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select>
+              </label>
+              <label className="text-sm font-semibold text-slate-700">Maximum price (₹)
+                <input type="number" min="0" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} placeholder="No limit" className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal outline-none focus:border-teal-600" />
+              </label>
+              <div className="flex flex-col justify-end gap-3">
+                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" checked={availableOnly} onChange={(event) => setAvailableOnly(event.target.checked)} className="h-4 w-4 accent-teal-700" /> Available workers only</label>
+                <button type="button" onClick={() => { setSearch(""); setSelectedCategory("All services"); setMaxPrice(""); setAvailableOnly(false); }} className="self-start text-sm font-semibold text-teal-800 underline underline-offset-2">Reset filters</button>
+              </div>
+              <p className="text-xs text-slate-500 sm:col-span-2 lg:col-span-4">Showing {filteredWorkers.length} of {workers.length} service listings. SmartMatch ranks the results below.</p>
+            </div>
+
             {error && (
               <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
                 {error}
@@ -789,15 +815,10 @@ function App() {
                 <p className="mt-2 text-sm text-slate-500">
                   {workers.length === 0
                     ? "Add an active service listing to an available worker profile."
-                    : "Try searching for Plumbing or clear your search."}
+                    : "Try changing the category, increasing the price limit, or resetting your filters."}
                 </p>
-                {search && (
-                  <button
-                    onClick={() => setSearch("")}
-                    className="mt-4 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
-                  >
-                    Clear search
-                  </button>
+                {(search || selectedCategory !== "All services" || maxPrice || availableOnly) && (
+                  <button onClick={() => { setSearch(""); setSelectedCategory("All services"); setMaxPrice(""); setAvailableOnly(false); }} className="mt-4 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">Reset filters</button>
                 )}
               </div>
             ) : (
