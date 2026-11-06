@@ -171,3 +171,36 @@ export function createWorkerService(payload: WorkerServiceCreate): Promise<Recor
 export function getMyWorkerServices(): Promise<WorkerListing[]> {
   return request<WorkerListing[]>("/api/workers/services/me", {}, true);
 }
+
+export interface ReviewCreate {
+  booking_id: string;
+  rating: number;
+  comment?: string;
+}
+
+export interface Review {
+  id: string;
+  booking_id: string;
+  customer_id: string;
+  worker_id: string;
+  rating: number;
+  comment?: string | null;
+  created_at: string;
+}
+
+export function submitReview(payload: ReviewCreate): Promise<Review> {
+  return request<Review>(
+    "/api/reviews/",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    true
+  );
+}
+
+export function getWorkerReviews(workerId: string): Promise<Review[]> {
+  return request<Review[]>(
+    `/api/reviews/worker/${encodeURIComponent(workerId)}`
+  );
+}
