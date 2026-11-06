@@ -10,6 +10,7 @@ from app.routers.services import router as services_router
 from app.routers.workers import router as workers_router
 from app.routers.worker_services import router as worker_services_router
 from app.routers.bookings import router as bookings_router
+from app.routers.reviews import router as reviews_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -33,6 +34,7 @@ app.include_router(services_router)
 app.include_router(workers_router)
 app.include_router(worker_services_router)
 app.include_router(bookings_router)
+app.include_router(reviews_router)
 
 app.add_middleware(
     CORSMiddleware,
